@@ -131,23 +131,25 @@ class Bkeep:
        equity の surplus (利益剰余金) 勘定に、収益・費用に追加した額
        を同時に計上する""" 
 
-       Dr = [dt, contrast, amount, comment]
-       Cr = [dt, contrast, -amount, comment]
+       Plus = [dt, contrast, amount, comment]
+       PlusE = [dt, name, amount, comment]
+       Minus = [dt, contrast, -amount, comment]
+       MinusE = [dt, name, -amount, comment]
 
        if not name:
            pass
        elif name in self.initial["assets"].keys():
-           self.ledger["assets"][name].append(Dr)
+           self.ledger["assets"][name].append(Plus)
        elif name in self.initial["liabilities"].keys():
-           self.ledger["liabilities"][name].append(Cr) 
+           self.ledger["liabilities"][name].append(Minus)
        elif name in self.initial["equity"].keys():
-           self.ledger["equity"][name].append(Cr)
+           self.ledger["equity"][name].append(Minus)
        elif name in self.initial["income"].keys():
-           self.ledger["income"][name].append(Cr)
-           self.ledger["equity"]["surplus"].append(Cr)
+           self.ledger["income"][name].append(Minus)
+           self.ledger["equity"]["surplus"].append(MinusE)
        elif name in self.initial["expenses"].keys():
-           self.ledger["expenses"][name].append(Dr)
-           self.ledger["equity"]["surplus"].append(Cr)
+           self.ledger["expenses"][name].append(Plus)
+           self.ledger["equity"]["surplus"].append(MinusE)
        else:
            raise ValueError(name + " isn't included in initial data.")
 
