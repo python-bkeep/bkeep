@@ -1,0 +1,48 @@
+{
+    "assets" : {
+        "cash" : 684,
+        "deposit" : 182425,
+        "iccard" : 1031,
+        "googleplay" : 1031,
+        "receivable" : 0,
+        "cgoods" : 0,
+        "aincome" : 0,
+        "dexpenses" : 0
+    },
+    "liabilities" : {
+        "credit" : 1083,
+        "payable" : 0,
+        "aexpenses" : 0,
+        "dincome" : 90000,
+        "temp" : 800,
+        "allowance" : 0
+    },
+    "equity" : {
+        "start" : 0,
+        "reserve" : 70000,
+        "retained" : 0,
+        "surplus" : 22257
+    },
+    "expenses" : {
+        "dining" : 0,
+        "grocery" : 0,
+        "clothing" : 0,
+        "communication" : 0,
+        "entertainment" : 0,
+        "travel" : 0,
+        "trainpass" : 0,
+        "pension" : 0,
+        "insurance" : 0,
+        "supplies" : 0,
+        "book" : 0,
+        "party" : 0,
+        "exloss" : 0
+    },
+    "income" : {
+        "fincome" : 0,
+        "bursary" : 0,
+        "salary" : 0,
+        "subsidy" : 0,
+        "exearn" : 0
+    }
+}
