@@ -99,7 +99,8 @@ class Bkeep:
         """ ledger をファイルに保存 """
         with open(path, "w") as wf:
             self._dtfmt()
-            json.dump(self.ledger, wf)
+            json.dump(self.ledger, wf, 
+                      indent=4, ensure_ascii=False)
             self._dtparse()
 
     def read_ledger(self, path):
