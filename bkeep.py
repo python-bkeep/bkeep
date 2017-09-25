@@ -96,10 +96,24 @@ class Bkeep:
             self._applydata(self._date, x[2], Ccont, -x[3], x[-1])
 
     def write_ledger(self, path):
+        """ ledger をファイルに保存 """
         with open(path, "w") as wf:
             self._dtfmt()
             json.dump(self.ledger, wf)
             self._dtparse()
+
+    def read_ledger(self, path):
+        """ ledger ファイル (json) を self.ledger に読み込む """
+        with open(path, "r", encoding="utf-8") as rf:
+            self.ledger = json.load(rf)
+            self._dtparse()
+            self.sort()
+
+    def sort(self):
+        """ ledger の各勘定について、datetime.date の順でソートする """
+        for elem in self.ledger.keys():
+            for ac in self.ledger[elem].keys():
+                self.ledger[elem][ac].sort(key=lambda x: x[0])
 
     # 内部関数
     def _alignjnl(self, data):
