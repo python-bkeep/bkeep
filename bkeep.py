@@ -6,8 +6,14 @@ import csv, json, re, datetime
 ###     エイリアス
 ###
 
+# コメント部分の正規表現
+cmt = re.compile(r"#(.*$)")
+
+# コメントの取得
+getcmt = lambda x: cmt.search(x).group(1).strip()
+
 # コメントの削除
-rmcomment = lambda x: re.sub(r"#.*$", "", x)
+rmcmt = lambda x: cmt.sub("", x).strip()
 
 # datetime.date 型を文字列に変換
 dtstr = lambda x: x.strftime("%Y%m%d")
@@ -50,7 +56,8 @@ class Bkeep:
         for x in self.initial.keys():
             for y in self.initial[x].keys():
                 if self.initial[x][y]:
-                    self.ledger[x][y] = [[date, self.initial[x][y]]]
+                    self.ledger[x][y] = [[date, "carryover",
+                                          self.initial[x][y], ""]]
                 else:
                     self.ledger[x][y] = []
 
@@ -59,18 +66,15 @@ class Bkeep:
         self.journal に格納する関数 """
 
         with open(path, "r", encoding="utf-8", newline="") as rf:
-            # csv データを借方と貸方に分類
-            tmp = ((x[:2], x[2:]) for x in csv.reader(rf))
-            self.journal = dict(zip(("Dr", "Cr"), zip(*tmp)))
+            # csv データの読み込み
+            # 借方勘定、借方金額、貸方勘定、貸方金額、コメント
+            # の形式で格納
+            self.journal = tuple(self._alignjnl(csv.reader(rf)))
             self._date = date
 
-        # 金額データの整数化
-        self.journal["Dr"] = list(self._alignjnl(self.journal["Dr"]))
-        self.journal["Cr"] = list(self._alignjnl(self.journal["Cr"]))
-
         # エラー判定
-        if (sum(x[1] for x in self.journal["Dr"]) !=
-            sum(x[1] for x in self.journal["Cr"])):
+        if (sum(x[1] for x in self.journal) !=
+            sum(x[3] for x in self.journal)):
 
             raise ValueError("Unbalanced in " + path)
 
@@ -78,40 +82,62 @@ class Bkeep:
         """ self.journal に保存されている通常の仕訳データを
         self.ledger に格納する関数。日付は self._date を参照する"""
 
-        # 借方項目の転記
-        for x in self.journal["Dr"]:
-            self._applydata(self._date, x[0], x[1])
-        
-        # 貸方項目の転記
-        for x in self.journal["Cr"]:
-            self._applydata(self._date, x[0], -x[1])
+        for x in self.journal:
 
+            # 行の貸借金額が一致するならば対照勘定、
+            # そうでなければ sundry (諸口) とする
+            Dcont = x[2] if x[1] == x[3] else "sundry"
+            Ccont = x[0] if x[1] == x[3] else "sundry"
+
+            # 借方項目の転記 (借方勘定、貸方勘定、借方金額、コメント)
+            self._applydata(self._date, x[0], Dcont, x[1], x[-1])
+
+            # 貸方項目の転記 (貸方勘定、借方勘定、貸方金額、コメント)
+            self._applydata(self._date, x[2], Ccont, -x[3], x[-1])
+
+    def write_ledger(self, path):
+        with open(path, "w") as wf:
+            self._dtfmt()
+            json.dump(self.ledger, wf)
 
     # 内部関数
     def _alignjnl(self, data):
         """ journal dict の金額部分について、コメントを除き、整数化する"""
-        for x, y in data:
-            x, y = rmcomment(x), rmcomment(y)
-            y = int(y) if y else 0
-            yield x, y
+        for Dname, Damount, Cname, Camount in data:
+            comment = getcmt(Camount) if cmt.search(Camount) else ""
+            Camount = rmcmt(Camount)
+            Damount = int(Damount) if Dname else 0
+            Camount = int(Camount) if Cname else 0
+            yield Dname, Damount, Cname, Camount, comment
 
-    def _applydata(self, dt, name, amount):
+    def _applydata(self, dt, name, contrast, amount, comment):
        """ self.apply の内部関数。
        equity の surplus (利益剰余金) 勘定に、収益・費用に追加した額
        を同時に計上する""" 
+
+       Dr = [dt, contrast, amount, comment]
+       Cr = [dt, contrast, -amount, comment]
+
        if not name:
            pass
        elif name in self.initial["assets"].keys():
-           self.ledger["assets"][name].append([dt, amount])
+           self.ledger["assets"][name].append(Dr)
        elif name in self.initial["liabilities"].keys():
-           self.ledger["liabilities"][name].append([dt, -amount]) 
+           self.ledger["liabilities"][name].append(Cr) 
        elif name in self.initial["equity"].keys():
-           self.ledger["equity"][name].append([dt, -amount])
+           self.ledger["equity"][name].append(Cr)
        elif name in self.initial["income"].keys():
-           self.ledger["income"][name].append([dt, -amount])
-           self.ledger["equity"]["surplus"].append([dt, -amount])
+           self.ledger["income"][name].append(Cr)
+           self.ledger["equity"]["surplus"].append(Cr)
        elif name in self.initial["expenses"].keys():
-           self.ledger["expenses"][name].append([dt, amount])
-           self.ledger["equity"]["surplus"].append([dt, -amount])
+           self.ledger["expenses"][name].append(Dr)
+           self.ledger["equity"]["surplus"].append(Cr)
        else:
            raise ValueError(name + " isn't included in initial data.")
+
+    def _dtfmt(self):
+        for elem in self.ledger.keys():
+            for ac in self.ledger[elem].keys():
+                for tr in self.ledger[elem][ac]:
+                    if isinstance(tr[0], datetime.date):
+                        tr[0] = dtstr(tr[0])
