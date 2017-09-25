@@ -99,6 +99,7 @@ class Bkeep:
         with open(path, "w") as wf:
             self._dtfmt()
             json.dump(self.ledger, wf)
+            self._dtparse()
 
     # 内部関数
     def _alignjnl(self, data):
@@ -141,3 +142,10 @@ class Bkeep:
                 for tr in self.ledger[elem][ac]:
                     if isinstance(tr[0], datetime.date):
                         tr[0] = dtstr(tr[0])
+
+    def _dtparse(self):
+        for elem in self.ledger.keys():
+            for ac in self.ledger[elem].keys():
+                for tr in self.ledger[elem][ac]:
+                    if isinstance(tr[0], str):
+                        tr[0] = strdt(tr[0])
