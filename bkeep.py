@@ -49,10 +49,8 @@ class Bkeep:
         with open(path, "r", encoding=encoding) as rf:
             self.initial = json.load(rf)
 
-        # 元帳データの作成
-        self.ledger = {x : {} for x in self.initial.keys()}
-        for x in self.ledger.keys():
-            self.ledger[x] = {y : [] for y in self.initial[x].keys()}
+        # 元帳データの初期化
+        self.clear_ledger()
 
         # 仕訳帳データの作成
         self.journal = {date : []}
@@ -136,6 +134,16 @@ class Bkeep:
             json.dump(self.ledger, wf, 
                       indent=4, ensure_ascii=False)
             self._dtparse()
+
+    def clear_journal(self):
+        """ journal を初期化 """
+        self.journal = {}
+
+    def clear_ledger(self):
+        """ ledger を初期化 """
+        self.ledger = {x : {} for x in self.initial.keys()}
+        for x in self.ledger.keys():
+            self.ledger[x] = {y : [] for y in self.initial[x].keys()}
 
     def sort(self):
         """ ledger の各勘定について、datetime.date の順でソートする """
