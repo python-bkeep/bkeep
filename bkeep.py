@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os, csv, json, re, datetime
+import os, re, copy, csv, json, datetime
 
 ###
 ###     エイリアス
@@ -44,6 +44,9 @@ class Bkeep:
         # initial ファイルの読み込み
         with open(path, "r", encoding=encoding) as rf:
             self.initial = json.load(rf)
+
+        # 試算表データの初期化
+        self.clear_tb()
 
         # 元帳データの初期化
         self.clear_ledger()
@@ -121,12 +124,41 @@ class Bkeep:
                 # 貸方項目の転記 (貸方勘定、借方勘定、貸方金額、コメント)
                 self._apply(day, x[2], Ccont, -x[3], x[-1])
 
+    def prepare(self, start, end):
+        """ 試算表の作成
+        self.tb に格納"""
+
+        # tb の初期化
+        self.clear_tb()
+
+        # assets, liabilities, equity
+        for elem in ("assets", "liabilities", "equity"):
+            for ac in self.ledger[elem].keys():
+                self.tb[elem][ac] = sum(
+                    x[2] for x in self.ledger[elem][ac]
+                    if x[0] <= end
+                )
+
+        # expenses, income
+        for elem in ("expenses", "income"):
+            for ac in self.ledger[elem].keys():
+                self.tb[elem][ac] = sum(
+                    x[2] for x in self.ledger[elem][ac]
+                    if x[0] >= start and x[0] <= end
+                )
+
+    def close(self):
+        """ 締め切り
+        試算表上の収益・費用の各項目を _closing を対照勘定
+        として仕訳し、転記する (次年度の start ファイルを作成
+        する際に活用できる) """
+        pass
+
     def read_ledger(self, path):
         """ ledger ファイル (json) を self.ledger に読み込む """
         with open(path, "r", encoding="utf-8") as rf:
             self.ledger = json.load(rf)
             self._dtparse()
-            self.sort()
 
     def write_ledger(self, path):
         """ ledger をファイルに保存 """
@@ -135,6 +167,12 @@ class Bkeep:
             json.dump(self.ledger, wf, 
                       indent=4, ensure_ascii=False)
             self._dtparse()
+
+    def write_tb(self, path):
+        """ ledger をファイルに保存 """
+        with open(path, "w") as wf:
+            json.dump(self.tb, wf,
+                      indent=4, ensure_ascii=False)
 
     def clear_journal(self):
         """ journal を初期化 """
@@ -145,6 +183,10 @@ class Bkeep:
         self.ledger = {x : {} for x in self.initial.keys()}
         for x in self.ledger.keys():
             self.ledger[x] = {y : [] for y in self.initial[x].keys()}
+
+    def clear_tb(self):
+        """ tb を初期化"""
+        self.tb = {x : {} for x in self.initial.keys()}
 
     def sort(self):
         """ ledger の各勘定について、datetime.date の順でソートする """
@@ -169,8 +211,8 @@ class Bkeep:
         Drnum, Crnum = entry[1] // days, entry[3] // days
         ordentry = [(entry[0], Drnum,
                      entry[2], Crnum, entry[4])]
-        lastentry = [(entry[0], entry[1] - (days * Drnum),
-                      entry[2], entry[1] - (days * Crnum),
+        lastentry = [(entry[0], entry[1] - ((days-1) * Drnum),
+                      entry[2], entry[1] - ((days-1) * Crnum),
                       entry[4])]
 
         while date < maxd:
@@ -245,3 +287,5 @@ if __name__ == "__main__":
     bk.journalize(inpdict)
     bk.journalize(adjdict, adj=True)
     bk.post()
+    bk.prepare(datetime.date(2017, 9, 1), datetime.date(2017, 9, 30))
+    bk.write_tb("tb.json")
