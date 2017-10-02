@@ -36,14 +36,10 @@ class Bkeep:
     """ 総勘定元帳のデータを格納するクラス。read メソッドによって、仕訳帳
     データを変換し、データをアップデートする """
 
-
     def __init__(self, path, date, encoding="utf-8"):
         """ スタートファイル (json 形式の残高試算表) を読み込み、
         self.initial に格納する
-        date はスタート時点の日付であり、datetime.date 型とする
-        initial を journal に格納するか否かは検討課題 (しかし、もし
-        そうするのであれば、initial の段階で ledger に代入する必要は
-        なくなる) """
+        date はスタート時点の日付であり、datetime.date 型とする """
 
         # initial ファイルの読み込み
         with open(path, "r", encoding=encoding) as rf:
@@ -76,9 +72,12 @@ class Bkeep:
                             y, self.initial[x][y], ""
                         ))
 
-    def journalize(self, comb, encoding="utf-8"):
-        """ {date : path, ...} からなる dict を受けとり、
-        各組み合わせごとに self.journal に格納する関数"""
+    def journalize(self, comb, adj=False, encoding="utf-8"):
+        """ 仕訳
+        {date : path, ...} からなる dict を受けとり、
+        各組み合わせごとに self.journal に格納する
+        adj=True の場合、仕訳を date から月末までの日数に
+        分割する"""
 
         for filedate, path in comb.items():
             
@@ -90,10 +89,11 @@ class Bkeep:
 
             # journal に既に同日のデータが格納されているなら
             # extend、そうでなければ追加
-            if filedate in self.journal.keys():
-                self.journal[filedate].extend(data)
+            if adj:
+                for x in data:
+                    self._adjentry(filedate, x)
             else:
-                self.journal[filedate] = data
+                self._inputtodict(filedate, data)
 
             # エラー判定
             if (sum(x[1] for x in self.journal[filedate]) !=
@@ -102,8 +102,9 @@ class Bkeep:
                 raise ValueError("Unbalanced in " + path)
 
     def post(self):
-        """ self.journal に保存されている通常の仕訳データを
-        self.ledger に格納する関数"""
+        """ 転記
+        self.journal に保存されている通常の仕訳データを
+        self.ledger に格納する"""
 
         for day in sorted(self.journal.keys()):
 
@@ -153,13 +154,40 @@ class Bkeep:
 
     # 内部関数
     def _alignjnl(self, data):
-        """ journal dict の金額部分について、コメントを除き、整数化する"""
+        """ 仕訳データの金額部分について、コメントを除き、整数化する"""
         for Dname, Damount, Cname, Camount in data:
             comment = getcmt(Camount) if cmt.search(Camount) else ""
             Camount = rmcmt(Camount)
             Damount = int(Damount) if Dname else 0
             Camount = int(Camount) if Cname else 0
             yield Dname, Damount, Cname, Camount, comment
+
+    def _adjentry(self, date, entry):
+        """ journalize に adj=T がついたときの内部関数"""
+        maxd = maxday(date)
+        days = (maxd - date).days + 1
+        Drnum, Crnum = entry[1] // days, entry[3] // days
+        ordentry = [(entry[0], Drnum,
+                     entry[2], Crnum, entry[4])]
+        lastentry = [(entry[0], entry[1] - (days * Drnum),
+                      entry[2], entry[1] - (days * Crnum),
+                      entry[4])]
+
+        while date < maxd:
+            self._inputtodict(date, ordentry)
+            date += datetime.timedelta(days=1)
+        else:
+            self._inputtodict(date, lastentry)
+
+    def _inputtodict(self, date, entry):
+        """ journal dict に entry を入れる内部関数 """
+
+        # date が未登録の場合は空ベクトルとする
+        if date not in self.journal.keys():
+            self.journal[date] = []
+
+        # 日付の key に entry を挿入
+        self.journal[date].extend(entry)
 
     def _apply(self, dt, name, contrast, amount, comment):
        """ self.post の内部関数。
@@ -204,14 +232,16 @@ class Bkeep:
                     if isinstance(tr[0], str):
                         tr[0] = strdt(tr[0])
 
-
 if __name__ == "__main__":
 
     bk = Bkeep("start.json", datetime.date(2017, 1, 1))
     path = "/home/ugos/bk"
     files = os.listdir(path)
     bkdata = [x for x in files if re.match("bk", x)]
+    adjdata = [x for x in files if re.match("adj", x)]
     inpdict = {strdt(re.sub(r"[^0-9]", "", x)) : os.path.join(path, x) for x in bkdata}
+    adjdict = {datetime.date(int(re.sub(r"[^0-9]", "", x)[:4]), int(re.sub(r"[^0-9]", "", x)[4:]), 1) : os.path.join(path, x) for x in adjdata}
 
     bk.journalize(inpdict)
+    bk.journalize(adjdict, adj=True)
     bk.post()
