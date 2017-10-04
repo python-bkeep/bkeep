@@ -18,10 +18,15 @@
         "allowance" : 0
     },
     "equity" : {
-        "start" : 0,
         "reserve" : 70000,
-        "retained" : 0,
-        "surplus" : 22257
+        "retained" : 22257
+    },
+    "income" : {
+        "fincome" : 0,
+        "bursary" : 0,
+        "salary" : 0,
+        "subsidy" : 0,
+        "exearn" : 0
     },
     "expenses" : {
         "dining" : 0,
@@ -37,12 +42,5 @@
         "book" : 0,
         "party" : 0,
         "exloss" : 0
-    },
-    "income" : {
-        "fincome" : 0,
-        "bursary" : 0,
-        "salary" : 0,
-        "subsidy" : 0,
-        "exearn" : 0
     }
 }

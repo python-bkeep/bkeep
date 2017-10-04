@@ -41,6 +41,9 @@ class Bkeep:
         self.initial に格納する
         date はスタート時点の日付であり、datetime.date 型とする """
 
+        # initial ファイルのパス、文字コード
+        self._inittype  = path, encoding
+        
         # initial ファイルの読み込み
         with open(path, "r", encoding=encoding) as rf:
             self.initial = json.load(rf)
@@ -111,6 +114,9 @@ class Bkeep:
 
         for day in sorted(self.journal.keys()):
 
+            # 損益勘定の初期化
+            self._incoming = []
+
             for x in self.journal[day]:
 
                 # 行の貸借金額が一致するならば対照勘定、
@@ -123,6 +129,13 @@ class Bkeep:
 
                 # 貸方項目の転記 (貸方勘定、借方勘定、貸方金額、コメント)
                 self._apply(day, x[2], Ccont, -x[3], x[-1])
+
+            # 損益勘定の剰余金への振り替え
+            if self._incoming:
+                self.ledger["equity"]["retained"].append(
+                    [day, "_incoming",
+                     sum(x[2] for x in self._incoming), ""]
+                )
 
     def prepare(self, start, end):
         """ 試算表の作成
@@ -160,17 +173,33 @@ class Bkeep:
             self.ledger = json.load(rf)
             self._dtparse()
 
-    def write_ledger(self, path):
+    def write_journal(self, path, encoding="utf-8"):
+        """ journal をファイルに保存 """
+
+        # 書き出し用データの作成
+        rslt = [["date", "Dr", "amount",
+                 "Cr", "amount", "comment"]]
+        for day in sorted(self.journal.keys()):
+            for x in self.journal[day]:
+                rslt.append([dtstr(day)])
+                rslt[-1].extend(x)
+
+        # データの書き出し
+        with open(path, "w", encoding=encoding) as wf:
+            csv.writer(wf).writerows(rslt)
+        
+
+    def write_ledger(self, path, encoding="utf-8"):
         """ ledger をファイルに保存 """
-        with open(path, "w") as wf:
+        with open(path, "w", encoding=encoding) as wf:
             self._dtfmt()
             json.dump(self.ledger, wf, 
                       indent=4, ensure_ascii=False)
             self._dtparse()
 
-    def write_tb(self, path):
+    def write_tb(self, path, encoding="utf-8"):
         """ ledger をファイルに保存 """
-        with open(path, "w") as wf:
+        with open(path, "w", encoding=encoding) as wf:
             json.dump(self.tb, wf,
                       indent=4, ensure_ascii=False)
 
@@ -193,6 +222,36 @@ class Bkeep:
         for elem in self.ledger.keys():
             for ac in self.ledger[elem].keys():
                 self.ledger[elem][ac].sort(key=lambda x: x[0])
+
+    def order(self):
+        """ initial, ledger, tb について、start ファイルで指定した順序
+        で並び換える (python 3.6 未満の dict が順序を記憶しない
+        ことに対応する暫定措置) """
+
+        from collections import OrderedDict as od
+
+        path, encoding = self._inittype
+        
+        # start ファイルの再読み込み
+        with open(path, "r", encoding=encoding) as rf:
+            self.initial = json.load(rf, object_pairs_hook=od)
+
+        # ledger のならびかえ
+        ledger = copy.deepcopy(self.initial)
+        for elem in self.initial.keys():
+            for ac in self.initial[elem].keys():
+                ledger[elem][ac] = self.ledger[elem][ac]
+
+        self.ledger = copy.deepcopy(ledger)
+
+        # tb のならびかえ
+        if self.tb["assets"]:
+            tb = copy.deepcopy(self.initial)
+            for elem in self.initial.keys():
+                for ac in self.initial[elem].keys():
+                    tb[elem][ac] = self.tb[elem][ac]
+
+            self.tb = copy.deepcopy(tb)
 
     # 内部関数
     def _alignjnl(self, data):
@@ -233,7 +292,7 @@ class Bkeep:
 
     def _apply(self, dt, name, contrast, amount, comment):
        """ self.post の内部関数。
-       equity の surplus (利益剰余金) 勘定に、収益・費用に追加した額
+       equity の retained (利益剰余金) 勘定に、収益・費用に追加した額
        を同時に計上する""" 
 
        Plus = [dt, contrast, amount, comment]
@@ -251,10 +310,10 @@ class Bkeep:
            self.ledger["equity"][name].append(Minus)
        elif name in self.initial["income"].keys():
            self.ledger["income"][name].append(Minus)
-           self.ledger["equity"]["surplus"].append(MinusE)
+           self._incoming.append(MinusE)
        elif name in self.initial["expenses"].keys():
            self.ledger["expenses"][name].append(Plus)
-           self.ledger["equity"]["surplus"].append(MinusE)
+           self._incoming.append(MinusE)
        else:
            raise ValueError(name + " isn't included in initial data.")
 
@@ -288,4 +347,7 @@ if __name__ == "__main__":
     bk.journalize(adjdict, adj=True)
     bk.post()
     bk.prepare(datetime.date(2017, 9, 1), datetime.date(2017, 9, 30))
+    bk.order()
+    bk.write_journal("tmp.csv")
+    bk.write_ledger("tmp.json")
     bk.write_tb("tb.json")
