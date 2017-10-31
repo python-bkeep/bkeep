@@ -37,7 +37,7 @@ class Bkeep:
     """ 総勘定元帳のデータを格納するクラス。read メソッドによって、仕訳帳
     データを変換し、データをアップデートする """
 
-    def __init__(self, path, date, encoding="utf-8"):
+    def __init__(self, path, date, encoding="utf-8", order=True):
         """ スタートファイル (json 形式の残高試算表) を読み込み、
         self.initial に格納する
         date はスタート時点の日付であり、datetime.date 型とする """
@@ -46,11 +46,14 @@ class Bkeep:
         self._inittype = path, encoding
 
         # ordered の属性
-        self._ordered = False
+        self._ordered = order
         
         # initial ファイルの読み込み
         with open(path, "r", encoding=encoding) as rf:
-            self.initial = json.load(rf)
+            if order:
+                self.initial = json.load(rf, object_pairs_hook=od)
+            else:
+                self.initial = json.load(rf)
 
         # 試算表データの初期化
         self.clear_tb()
@@ -255,7 +258,11 @@ class Bkeep:
     def read_ledger(self, path):
         """ ledger ファイル (json) を self.ledger に読み込む """
         with open(path, "r", encoding="utf-8") as rf:
-            self.ledger = json.load(rf)
+            if self._ordered:
+                self.ledger = json.load(rf, object_pairs_hook=od)
+            else:
+                self.ledger = json.load(rf)
+
             self._dtparse()
 
     def write_journal(self, path, encoding="utf-8"):
@@ -294,9 +301,17 @@ class Bkeep:
 
     def clear_ledger(self):
         """ ledger を初期化 """
-        self.ledger = {x : {} for x in self.initial.keys()}
-        for x in self.ledger.keys():
-            self.ledger[x] = {y : [] for y in self.initial[x].keys()}
+        if self._ordered:
+            self.ledger = od()
+            for elem in self.initial.keys():
+                self.ledger[elem] = od()
+                for x in self.initial[elem].keys():
+                    self.ledger[elem][x] = []
+        else:
+            self.ledger = {x : {} for x in self.initial.keys()}
+            for x in self.ledger.keys():
+                self.ledger[x] = {y : [] for y in self.initial[x].keys()}
+            
 
     def clear_tb(self):
         """ tb を初期化"""
@@ -313,34 +328,6 @@ class Bkeep:
             for ac in self.ledger[elem].keys():
                 self.ledger[elem][ac].sort(key=lambda x: x[0])
 
-    def order(self):
-        """ initial, ledger, tb について、start ファイルで指定した順序
-        で並び換える (python 3.6 未満の dict が順序を記憶しない
-        ことに対応する暫定措置) """
-
-        self._ordered = True
-        path, encoding = self._inittype
-        
-        # start ファイルの再読み込み
-        with open(path, "r", encoding=encoding) as rf:
-            self.initial = json.load(rf, object_pairs_hook=od)
-
-        # ledger のならびかえ
-        ledger = copy.deepcopy(self.initial)
-        for elem in self.initial.keys():
-            for ac in self.initial[elem].keys():
-                ledger[elem][ac] = self.ledger[elem][ac]
-
-        self.ledger = copy.deepcopy(ledger)
-
-        # tb のならびかえ
-        if self.tb["assets"]:
-            tb = copy.deepcopy(self.initial)
-            for elem in self.initial.keys():
-                for ac in self.initial[elem].keys():
-                    tb[elem][ac] = self.tb[elem][ac]
-
-            self.tb = copy.deepcopy(tb)
 
     # 内部関数
 
@@ -459,7 +446,7 @@ class Bkeep:
 if __name__ == "__main__":
 
     today = datetime.date.today()
-    bk = Bkeep("start.json", datetime.date(today.year, 1, 1))
+    bk = Bkeep("/home/ugos/wdir/start.json", datetime.date(today.year, 1, 1))
     path = "/home/ugos/bk"
     files = os.listdir(path)
     bkdata = [x for x in files if re.match("bk", x)]
@@ -471,7 +458,6 @@ if __name__ == "__main__":
     bk.journalize(adjdict, adj=True)
     bk.post()
     bk.prepare(datetime.date(today.year, today.month, 1), today)
-    bk.order()
     # bk.write_journal("tmp.csv")
     # bk.write_ledger("tmp.json")
     # bk.write_tb("tb.json")
