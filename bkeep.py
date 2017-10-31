@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
-import os, re, copy, csv, json, datetime
+import sys, os, re, copy, csv, json, datetime
+from collections import OrderedDict as od
 
 ###
 ###     エイリアス
@@ -42,7 +43,10 @@ class Bkeep:
         date はスタート時点の日付であり、datetime.date 型とする """
 
         # initial ファイルのパス、文字コード
-        self._inittype  = path, encoding
+        self._inittype = path, encoding
+
+        # ordered の属性
+        self._ordered = False
         
         # initial ファイルの読み込み
         with open(path, "r", encoding=encoding) as rf:
@@ -77,6 +81,9 @@ class Bkeep:
                             "_bal", self.initial[x][y],
                             y, self.initial[x][y], ""
                         ))
+
+
+    # 仕訳・転記・締切
 
     def journalize(self, comb, adj=False, encoding="utf-8"):
         """ 仕訳
@@ -137,6 +144,16 @@ class Bkeep:
                      sum(x[2] for x in self._incoming), ""]
                 )
 
+    def close(self):
+        """ 締め切り
+        試算表上の収益・費用の各項目を _closing を対照勘定
+        として仕訳し、転記する (次年度の start ファイルを作成
+        する際に活用できる) """
+        pass
+
+
+    # 試算表・財務諸表の作成
+
     def prepare(self, start, end):
         """ 試算表の作成
         self.tb に格納"""
@@ -160,12 +177,80 @@ class Bkeep:
                     if x[0] >= start and x[0] <= end
                 )
 
-    def close(self):
-        """ 締め切り
-        試算表上の収益・費用の各項目を _closing を対照勘定
-        として仕訳し、転記する (次年度の start ファイルを作成
-        する際に活用できる) """
-        pass
+    def make(self):
+        """ 貸借対照表・損益計算書の作成
+        self.tb を参照する """
+
+        total = {x : sum(self.tb[x].values()) for x in self.tb.keys()}
+        earn = total["income"] - total["expenses"]
+        epi = earn / total["income"]
+
+        # 結果の print (assets ~ expenses)
+        for elem in self.tb.keys():
+            print(elem.upper())
+            print("=============")
+            for x in self.tb[elem].items():
+                print("{:<18}{}".format(*x))
+            print("-------------")
+            print("{:<18}{}\n".format("TOTAL", total[elem]))
+
+        # 結果の print (summary)
+        print("SUMMARY")
+        print("=============")
+        print("{:<18}{}".format("earn", earn))
+        print("{:<18}{}".format("epi", epi))
+
+
+    # 月次・週次データの作成
+
+    def calcMonthly(self, start, end):
+        """ 月次データの作成
+        最終月は当日までのデータ """
+
+        # start -- end の組の作成
+        periods = []
+        while start <= end:
+            mid = maxday(start)
+            mid = mid if mid < end else end
+            periods.append((start, mid))
+            start = mid + datetime.timedelta(days=1)
+
+        # 列名の作成
+        rslt = []
+        rslt.append(self._makeData(start, end, True))
+
+        # データの作成
+        for x in periods:
+            rslt.append(self._makeData(*x))
+
+        # 結果の保存
+        return rslt
+
+    def calcSpan(self, start, end, span=7):
+        """ 週次データの作成 (span=7 の場合)
+        当日を起点に期間ずつ集計する """
+
+        # start -- end の組の作成
+        periods = []
+        while start <= end:
+            mid = end - datetime.timedelta(days=span-1)
+            mid = mid if mid > start else start
+            periods.insert(0, (mid, end))
+            end = mid - datetime.timedelta(days=1)
+
+        # 列名の作成
+        rslt = []
+        rslt.append(self._makeData(start, end, True))
+
+        # データの作成
+        for x in periods:
+            rslt.append(self._makeData(*x))
+
+        # 結果の保存
+        return rslt
+
+
+    # 特殊なデータの読み込み・初期化
 
     def read_ledger(self, path):
         """ ledger ファイル (json) を self.ledger に読み込む """
@@ -215,7 +300,12 @@ class Bkeep:
 
     def clear_tb(self):
         """ tb を初期化"""
-        self.tb = {x : {} for x in self.initial.keys()}
+        if self._ordered:
+            self.tb = od()
+            for x in self.initial.keys():
+                self.tb[x] = od()
+        else:
+            self.tb = {x : {} for x in self.initial.keys()}
 
     def sort(self):
         """ ledger の各勘定について、datetime.date の順でソートする """
@@ -228,8 +318,7 @@ class Bkeep:
         で並び換える (python 3.6 未満の dict が順序を記憶しない
         ことに対応する暫定措置) """
 
-        from collections import OrderedDict as od
-
+        self._ordered = True
         path, encoding = self._inittype
         
         # start ファイルの再読み込み
@@ -254,6 +343,7 @@ class Bkeep:
             self.tb = copy.deepcopy(tb)
 
     # 内部関数
+
     def _alignjnl(self, data):
         """ 仕訳データの金額部分について、コメントを除き、整数化する"""
         for Dname, Damount, Cname, Camount in data:
@@ -317,6 +407,39 @@ class Bkeep:
        else:
            raise ValueError(name + " isn't included in initial data.")
 
+    def _makeData(self, start, end, names=False):
+        """ 各種 calc のために prepare, make する """
+
+        # 試算表の作成
+        self.prepare(start, end)
+
+        # 列名作成の場合
+        if names:
+
+            # データの作成 (列名の作成)
+            rslt = ["start", "end", "earn", "epi"]
+            for elem in self.tb.keys():
+                rslt.extend(self.tb[elem].keys())
+                rslt.append(elem.upper())
+
+        # データ出力の場合
+        else:
+
+            # 各要素の合計、利益、利益率の計算
+            total = {x : sum(self.tb[x].values()) for x in self.tb.keys()}
+            earn = total["income"] - total["expenses"]
+            epi = earn / total["income"]
+
+            # 出力データの作成
+            rslt = [dtstr(start), dtstr(end), earn, epi]
+            for elem in self.tb.keys():
+                rslt.extend(self.tb[elem].values())
+                rslt.append(total[elem])
+
+        # データの出力
+        return rslt
+
+
     def _dtfmt(self):
         """ self.ledger の日付を文字列に変換 """
         for elem in self.ledger.keys():
@@ -335,7 +458,8 @@ class Bkeep:
 
 if __name__ == "__main__":
 
-    bk = Bkeep("start.json", datetime.date(2017, 1, 1))
+    today = datetime.date.today()
+    bk = Bkeep("start.json", datetime.date(today.year, 1, 1))
     path = "/home/ugos/bk"
     files = os.listdir(path)
     bkdata = [x for x in files if re.match("bk", x)]
@@ -346,8 +470,9 @@ if __name__ == "__main__":
     bk.journalize(inpdict)
     bk.journalize(adjdict, adj=True)
     bk.post()
-    bk.prepare(datetime.date(2017, 9, 1), datetime.date(2017, 9, 30))
+    bk.prepare(datetime.date(today.year, today.month, 1), today)
     bk.order()
-    bk.write_journal("tmp.csv")
-    bk.write_ledger("tmp.json")
-    bk.write_tb("tb.json")
+    # bk.write_journal("tmp.csv")
+    # bk.write_ledger("tmp.json")
+    # bk.write_tb("tb.json")
+    bk.make()
