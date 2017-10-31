@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import sys, os, re, copy, csv, json, datetime
+import sys, os, argparse, re, copy, csv, json, datetime
 from collections import OrderedDict as od
 
 ###
@@ -445,20 +445,40 @@ class Bkeep:
 
 if __name__ == "__main__":
 
-    today = datetime.date.today()
-    bk = Bkeep("/home/ugos/wdir/start.json", datetime.date(today.year, 1, 1))
-    path = "/home/ugos/bk"
+    # argument parse
+    p = argparse.ArgumentParser()
+
+    p.add_argument(
+        "-i", "--input", dest="input",
+        default=None,
+        help=r"bk data directory path (default: $BKINPUT)"
+    )
+
+    p.add_argument(
+        "-o", "--output", dest="output",
+        default=None,
+        help=r"where to write a output files (default: $BKOUTPUT)"
+    )
+
+    args = p.parse_args()
+
+    path = args.input if args.input else os.environ["BKINPUT"]
+    bkoutput = args.output if args.output else os.environ["BKOUTPUT"]
+
     files = os.listdir(path)
     bkdata = [x for x in files if re.match("bk", x)]
     adjdata = [x for x in files if re.match("adj", x)]
     inpdict = {strdt(re.sub(r"[^0-9]", "", x)) : os.path.join(path, x) for x in bkdata}
     adjdict = {datetime.date(int(re.sub(r"[^0-9]", "", x)[:4]), int(re.sub(r"[^0-9]", "", x)[4:]), 1) : os.path.join(path, x) for x in adjdata}
 
+    bk = Bkeep(os.path.join(path, "init.json"),
+               min(strdt(re.sub(r"[^0-9]", "", x)) for x in bkdata))
+    today = datetime.date.today()
+
     bk.journalize(inpdict)
     bk.journalize(adjdict, adj=True)
     bk.post()
     bk.prepare(datetime.date(today.year, today.month, 1), today)
-    # bk.write_journal("tmp.csv")
-    # bk.write_ledger("tmp.json")
-    # bk.write_tb("tb.json")
+    bk.write_journal(os.path.join(bkoutput, "journal.csv"))
+    bk.write_ledger(os.path.join(bkoutput, "ledger.json"))
     bk.make()
