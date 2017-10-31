@@ -471,9 +471,9 @@ if __name__ == "__main__":
     inpdict = {strdt(re.sub(r"[^0-9]", "", x)) : os.path.join(path, x) for x in bkdata}
     adjdict = {datetime.date(int(re.sub(r"[^0-9]", "", x)[:4]), int(re.sub(r"[^0-9]", "", x)[4:]), 1) : os.path.join(path, x) for x in adjdata}
 
-    bk = Bkeep(os.path.join(path, "init.json"),
-               min(strdt(re.sub(r"[^0-9]", "", x)) for x in bkdata))
+    start = min(strdt(re.sub(r"[^0-9]", "", x)) for x in bkdata)
     today = datetime.date.today()
+    bk = Bkeep(os.path.join(path, "init.json"), start)
 
     bk.journalize(inpdict)
     bk.journalize(adjdict, adj=True)
@@ -482,3 +482,9 @@ if __name__ == "__main__":
     bk.write_journal(os.path.join(bkoutput, "journal.csv"))
     bk.write_ledger(os.path.join(bkoutput, "ledger.json"))
     bk.make()
+
+    with open(os.path.join(bkoutput, "fsMonthly.csv"), "w") as wf:
+        csv.writer(wf).writerows(bk.calcMonthly(start, today))
+
+    with open(os.path.join(bkoutput, "fsWeekly.csv"), "w") as wf:
+        csv.writer(wf).writerows(bk.calcSpan(start, today))
