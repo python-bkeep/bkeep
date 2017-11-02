@@ -29,19 +29,19 @@
           "assets" : {
               "cash" : 20,
               "deposit" : 30
-          }
+          },
           "liabilities" : {
               "credit" : 40
-          }
+          },
           "equity" : {
               "retained" : 10
-          }
+          },
           "income" : {
               "salary" : 0
-          }
+          },
           "expenses" : {
-              "dining" : 0
-              "travel" : 0
+              "dining" : 0,
+              "travel" : 0,
               "insurance" : 0
           }
       }
