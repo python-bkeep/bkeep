@@ -1,0 +1,50 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import bkeep
+
+if __name__ == "__main__":
+
+    # argument parse
+    p = argparse.ArgumentParser()
+
+    p.add_argument(
+        "--input", "-i", 
+        default=None,
+        help=r"bk data directory path (default: $BKINPUT)"
+    )
+
+    p.add_argument(
+        "--output", "-o",
+        default=None,
+        help=r"where to write a output files (default: $BKOUTPUT)"
+    )
+
+    args = p.parse_args()
+
+    # 基本変数の定義
+    path = args.input if args.input else os.environ["BKINPUT"]
+    bkoutput = args.output if args.output else os.environ["BKOUTPUT"]
+    inpdict = bkeep.pathtract(path, "bk")
+    adjdict = bkeep.pathtract(path, "adj")
+
+    # 日付の指定 (initial data と今日の日付)
+    start = min(inpdict.keys())
+    today = datetime.date.today()
+
+    # 帳簿記入
+    bk = bkeep.Bkeep(os.path.join(path, "init.json"), start)
+    bk.journalize(inpdict)
+    bk.journalize(adjdict, adj=True)
+    bk.post()
+    bk.write_journal(os.path.join(bkoutput, "journal.csv"))
+    bk.write_ledger(os.path.join(bkoutput, "ledger.json"))
+
+    with open(os.path.join(bkoutput, "fsMonthly.csv"), "w") as wf:
+        csv.writer(wf).writerows(bk.calcMonthly(start, today))
+
+    with open(os.path.join(bkoutput, "fsWeekly.csv"), "w") as wf:
+        csv.writer(wf).writerows(bk.calcSpan(start, today))
+
+    bk.prepare(datetime.date(today.year, today.month, 1), today)
+    bk.make()

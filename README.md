@@ -22,7 +22,7 @@
   
   # Bkeep オブジェクトの初期化
   bk = bkeep.Bkeep(
-      "path to initial json file",
+      "PATH TO INITIAL JSON FILE",
        datetime.date(YYYY, MM, DD) 
   )
   
@@ -57,3 +57,9 @@
   # 財務諸表の出力
   bk.make()
   ```
+
+## Future:
+
+- クラスを定義するファイルと実行ファイルを分離
+- --point 引数によって、make の時点を指定できるようにする
+- -y (--year)、-w (--week) を指定すると、年・週単位で make する
