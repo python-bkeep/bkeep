@@ -12,6 +12,43 @@
 - `# python3 setup.py install` OR
 - `$ python3 setup.py install --user`
 
+## Preparation:
+
+- ディレクトリの作成
+    - 初期化ファイルおよび記帳ファイルを保存しているディレクトリ (以下、INPUT)、および、bkeep スクリプトが計算した元帳や財務諸表データを保存するディレクトリ (以下、OUTPUT) を作成
+    - `.bashrc` などに、環境変数
+      ```
+      export BKINPUT="INPUT へのパス"
+      export BKOUTPUT="OUTPUT へのパス"
+      ```
+      を設定しておくと、コマンドラインからの bkeep の利用の際に、INPUT および OUTPUT のパスを指定しなくても実行できる
+- 初期化ファイルの作成
+    - 以下のような json ファイルを INPUT に `init.json` という名前で保存
+      ```
+      {
+          "assets" : {
+              "cash" : 20,
+              "deposit" : 30
+          }
+          "liabilities" : {
+              "credit" : 40
+          }
+          "equity" : {
+              "retained" : 10
+          }
+          "income" : {
+              "salary" : 0
+          }
+          "expenses" : {
+              "dining" : 0
+              "travel" : 0
+              "insurance" : 0
+          }
+      }
+      ```
+    - "assets", "liabilities", "equity", "income", "expenses" (簿記の 5 要素) は、上記のとおりの科目名を用いなければならない
+    - "equity" の要素として、"retained" (剰余金) という要素を設定しなればならない
+
 ## Usage:
 
 - コマンドライン上の利用:
