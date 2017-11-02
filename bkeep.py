@@ -9,6 +9,7 @@ from collections import OrderedDict as od
 
 # コメント部分の正規表現
 cmt = re.compile(r"#(.*$)")
+nnum = re.compile(r"[^0-9]")
 
 # コメントの取得
 getcmt = lambda x: cmt.search(x).group(1).strip()
@@ -24,10 +25,44 @@ strdt = lambda x: datetime.date(int(x[:4]), int(x[4:6]), int(x[6:]))
 
 # 月末日の計算
 def maxday(x):
+    """ datetime.date を指定すると、その月の月末日を返す """
     try:
         return maxday(datetime.date(x.year, x.month, x.day + 1))
     except:
         return x
+
+# datetime と ファイル名の組み合わせの作成
+# ファイル名からなる iterable を受け取り、dict を返す
+def mkfiledict(files):
+    rslt = {}
+    for path in files:
+
+        # datetime 部分の抽出
+        dt = nnum.sub("", os.path.basename(path))
+
+        # datetime.date への変換
+        if len(dt) == 6:        # YYYYMM
+            dt = datetime.date(int(dt[:4]), int(dt[4:]), 1)
+        elif len(dt) == 8:      # YYYYMMDD
+            dt = strdt(dt)
+        else:                   # 破損データ
+            dt = None
+
+        # dict への格納
+        if dt:
+            rslt[dt] = path
+
+    # 結果の出力
+    return rslt
+
+# bk ファイルや adj ファイルを列挙する関数
+def pathtract(path, match):
+    """ path と match を指定すると、mkfiledict 関数を利用して
+    datetime と file の組み合わせを返す関数 """
+    opj, ol = os.path.join, os.listdir
+    files = (opj(path, x) for x in ol(path) if re.match(match, x))
+    return mkfiledict(files)
+
 
 ###
 ###     クラスの定義
@@ -64,7 +99,7 @@ class Bkeep:
         # 仕訳帳データの作成
         self.journal = {date : []}
 
-        # TB データを仕訳帳に仕訳 (_bal は beginning balance)
+        # init データを仕訳帳に仕訳 (_bal は beginning balance)
         for x in self.initial.keys():
 
             # 借方科目の場合
@@ -166,7 +201,7 @@ class Bkeep:
 
         # assets, liabilities, equity
         for elem in ("assets", "liabilities", "equity"):
-            for ac in self.ledger[elem].keys():
+            for ac in self.initial[elem].keys():
                 self.tb[elem][ac] = sum(
                     x[2] for x in self.ledger[elem][ac]
                     if x[0] <= end
@@ -174,19 +209,23 @@ class Bkeep:
 
         # expenses, income
         for elem in ("expenses", "income"):
-            for ac in self.ledger[elem].keys():
+            for ac in self.initial[elem].keys():
                 self.tb[elem][ac] = sum(
                     x[2] for x in self.ledger[elem][ac]
                     if x[0] >= start and x[0] <= end
                 )
 
-    def make(self):
+    def make(self, path=None, encoding="utf-8"):
         """ 貸借対照表・損益計算書の作成
         self.tb を参照する """
 
         total = {x : sum(self.tb[x].values()) for x in self.tb.keys()}
         earn = total["income"] - total["expenses"]
-        epi = earn / total["income"]
+        epi = earn / total["income"] if total["income"] else 0
+
+        # path が指定されている場合はそこに出力する
+        if path:
+            sys.stdout = open(path, "w", encoding=encoding)
 
         # 結果の print (assets ~ expenses)
         for elem in self.tb.keys():
@@ -202,6 +241,11 @@ class Bkeep:
         print("=============")
         print("{:<18}{}".format("earn", earn))
         print("{:<18}{}".format("epi", epi))
+
+        # print の出力先を元に戻す
+        if path:
+            sys.stdout.close()
+            sys.stdout = sys.__stdout__
 
 
     # 月次・週次データの作成
@@ -258,11 +302,7 @@ class Bkeep:
     def read_ledger(self, path):
         """ ledger ファイル (json) を self.ledger に読み込む """
         with open(path, "r", encoding="utf-8") as rf:
-            if self._ordered:
-                self.ledger = json.load(rf, object_pairs_hook=od)
-            else:
-                self.ledger = json.load(rf)
-
+            self.ledger = json.load(rf) 
             self._dtparse()
 
     def write_journal(self, path, encoding="utf-8"):
@@ -301,17 +341,9 @@ class Bkeep:
 
     def clear_ledger(self):
         """ ledger を初期化 """
-        if self._ordered:
-            self.ledger = od()
-            for elem in self.initial.keys():
-                self.ledger[elem] = od()
-                for x in self.initial[elem].keys():
-                    self.ledger[elem][x] = []
-        else:
-            self.ledger = {x : {} for x in self.initial.keys()}
-            for x in self.ledger.keys():
-                self.ledger[x] = {y : [] for y in self.initial[x].keys()}
-            
+        self.ledger = {x : {} for x in self.initial.keys()}
+        for x in self.ledger.keys():
+            self.ledger[x] = {y : [] for y in self.initial[x].keys()}
 
     def clear_tb(self):
         """ tb を初期化"""
@@ -415,7 +447,7 @@ class Bkeep:
             # 各要素の合計、利益、利益率の計算
             total = {x : sum(self.tb[x].values()) for x in self.tb.keys()}
             earn = total["income"] - total["expenses"]
-            epi = earn / total["income"]
+            epi = earn / total["income"] if total["income"] else 0
 
             # 出力データの作成
             rslt = [dtstr(start), dtstr(end), earn, epi]
@@ -449,42 +481,41 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser()
 
     p.add_argument(
-        "-i", "--input", dest="input",
+        "--input", "-i", 
         default=None,
         help=r"bk data directory path (default: $BKINPUT)"
     )
 
     p.add_argument(
-        "-o", "--output", dest="output",
+        "--output", "-o",
         default=None,
         help=r"where to write a output files (default: $BKOUTPUT)"
     )
 
     args = p.parse_args()
 
+    # 基本変数の定義
     path = args.input if args.input else os.environ["BKINPUT"]
     bkoutput = args.output if args.output else os.environ["BKOUTPUT"]
+    inpdict, adjdict = pathtract(path, "bk"), pathtract(path, "adj")
 
-    files = os.listdir(path)
-    bkdata = [x for x in files if re.match("bk", x)]
-    adjdata = [x for x in files if re.match("adj", x)]
-    inpdict = {strdt(re.sub(r"[^0-9]", "", x)) : os.path.join(path, x) for x in bkdata}
-    adjdict = {datetime.date(int(re.sub(r"[^0-9]", "", x)[:4]), int(re.sub(r"[^0-9]", "", x)[4:]), 1) : os.path.join(path, x) for x in adjdata}
-
-    start = min(strdt(re.sub(r"[^0-9]", "", x)) for x in bkdata)
+    # 日付の指定 (initial data と今日の日付)
+    start = min(inpdict.keys())
     today = datetime.date.today()
-    bk = Bkeep(os.path.join(path, "init.json"), start)
 
+    # 帳簿記入
+    bk = Bkeep(os.path.join(path, "init.json"), start)
     bk.journalize(inpdict)
     bk.journalize(adjdict, adj=True)
     bk.post()
-    bk.prepare(datetime.date(today.year, today.month, 1), today)
     bk.write_journal(os.path.join(bkoutput, "journal.csv"))
     bk.write_ledger(os.path.join(bkoutput, "ledger.json"))
-    bk.make()
 
     with open(os.path.join(bkoutput, "fsMonthly.csv"), "w") as wf:
         csv.writer(wf).writerows(bk.calcMonthly(start, today))
 
     with open(os.path.join(bkoutput, "fsWeekly.csv"), "w") as wf:
         csv.writer(wf).writerows(bk.calcSpan(start, today))
+
+    bk.prepare(datetime.date(today.year, today.month, 1), today)
+    bk.make()
