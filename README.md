@@ -9,8 +9,8 @@
 
 ## Installation:
 
-- `# python setup.py install` OR
-- `$ python setup.py install --user`
+- `# python3 setup.py install` OR
+- `$ python3 setup.py install --user`
 
 ## Usage:
 
