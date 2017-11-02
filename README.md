@@ -48,10 +48,20 @@
       ```
     - "assets", "liabilities", "equity", "income", "expenses" (簿記の 5 要素) は、上記のとおりの科目名を用いなければならない
     - "equity" の要素として、"retained" (剰余金) という要素を設定しなればならない
+- 記帳データの作成ルール
+- 日割計算データの作成ルール
 
 ## Usage:
 
 - コマンドライン上の利用:
+    - 環境変数 BKINPUT および BKOUTPUT を設定している場合
+      ```
+      $ bkeep
+      ```
+    - 設定していない場合
+      ```
+      $ bkeep -i INPUT へのパス -o OUTPUT へのパス
+      ```
 - python 上での利用:
   ```
   # bkeep パッケージのインストール
