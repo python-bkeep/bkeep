@@ -21,6 +21,18 @@ if __name__ == "__main__":
         help=r"where to write a output files (default: $BKOUTPUT)"
     )
 
+    p.add_argument(
+        "--endpoint", "-p",
+        default="today",
+        help=r"when is the calculation end point? (default: today)"
+    )
+
+    p.add_argument(
+        "--calccsv", "-c",
+        action="store_true", default=False,
+        help=r"calculate some csv files (default: False)"
+    )
+
     args = p.parse_args()
 
     # 基本変数の定義
@@ -31,21 +43,34 @@ if __name__ == "__main__":
 
     # 日付の指定 (initial data と今日の日付)
     start = min(inpdict.keys())
-    today = datetime.date.today()
+    if args.endpoint == "today":
+        end = datetime.date.today()
+    else:
+        end = bkeep.strdt(args.endpoint)
 
     # 帳簿記入
     bk = bkeep.Bkeep(os.path.join(path, "init.json"), start)
     bk.journalize(inpdict)
     bk.journalize(adjdict, adj=True)
     bk.post()
-    bk.write_journal(os.path.join(bkoutput, "journal.csv"))
     bk.write_ledger(os.path.join(bkoutput, "ledger.json"))
 
-    with open(os.path.join(bkoutput, "fsMonthly.csv"), "w") as wf:
-        csv.writer(wf).writerows(bk.calcMonthly(start, today))
+    if args.calccsv:
 
-    with open(os.path.join(bkoutput, "fsWeekly.csv"), "w") as wf:
-        csv.writer(wf).writerows(bk.calcSpan(start, today))
+        # 仕訳データの出力
+        bk.write_journal(os.path.join(bkoutput, "journal.csv"),
+                         encoding="shift-jis")
 
-    bk.prepare(datetime.date(today.year, today.month, 1), today)
-    bk.make()
+        # 月次 csv データの作成
+        with open(os.path.join(bkoutput, "fsMonthly.csv"), "w",
+                  encoding="shift-jis") as wf:
+            csv.writer(wf).writerows(bk.calcMonthly(start, end))
+
+        # 週次 csv データの作成
+        with open(os.path.join(bkoutput, "fsWeekly.csv"), "w",
+                  encoding="shift-jis") as wf:
+            csv.writer(wf).writerows(bk.calcSpan(start, end))
+
+    # 試算表と FS の作成
+    bk.prepare(datetime.date(end.year, end.month, 1), end)
+    bk.cat()

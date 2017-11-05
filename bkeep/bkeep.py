@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import sys, os, argparse, re, copy, csv, json, datetime
+import sys, os, re, copy, csv, json, datetime
 from collections import OrderedDict as od
 
 ###
@@ -89,6 +89,9 @@ class Bkeep:
                 self.initial = json.load(rf, object_pairs_hook=od)
             else:
                 self.initial = json.load(rf)
+
+        # 財務諸表データの初期化
+        self.fs = {}
 
         # 試算表データの初期化
         self.clear_tb()
@@ -199,6 +202,9 @@ class Bkeep:
         # tb の初期化
         self.clear_tb()
 
+        # tb の名前を記憶
+        self._tbname = (start, end)
+
         # assets, liabilities, equity
         for elem in ("assets", "liabilities", "equity"):
             for ac in self.initial[elem].keys():
@@ -215,13 +221,32 @@ class Bkeep:
                     if x[0] >= start and x[0] <= end
                 )
 
-    def make(self, path=None, encoding="utf-8"):
+    def make(self, add=False):
+        """ 貸借対照表・損益計算書の作成 
+        add=True ならば、データを追加する
+        期間は self._tbname を参照する"""
+
+        # add=False なら self.fs を初期化
+        if not add:
+            self.fs = {}
+
+        # 試算表データの格納
+        self.fs[self._tbname] = copy.deepcopy(self.tb)
+
+    def cat(self, path=None, encoding="utf-8"):
         """ 貸借対照表・損益計算書の作成
-        self.tb を参照する """
+        self.fs を参照する """
+
+        # 現状はまだ tb を参照している
 
         total = {x : sum(self.tb[x].values()) for x in self.tb.keys()}
         earn = total["income"] - total["expenses"]
         epi = earn / total["income"] if total["income"] else 0
+
+        # 勘定科目名の最大値
+        n = max(len(x) for x in self._acquire_keys())
+        m = max(len("{:,d}".format(x)) for x in self._acquire_values(self.tb))
+        m = max([5, m])
 
         # path が指定されている場合はそこに出力する
         if path:
@@ -232,15 +257,15 @@ class Bkeep:
             print(elem.upper())
             print("=============")
             for x in self.tb[elem].items():
-                print("{:<18}{}".format(*x))
+                print("{:<{}}{:>{},d}".format(x[0], n+1, x[1], m))
             print("-------------")
-            print("{:<18}{}\n".format("TOTAL", total[elem]))
+            print("{:<{}}{:>{},d}\n".format("TOTAL", n+1, total[elem], m))
 
         # 結果の print (summary)
         print("SUMMARY")
         print("=============")
-        print("{:<18}{}".format("earn", earn))
-        print("{:<18}{}".format("epi", epi))
+        print("{:<{}}{:>{},d}".format("earn", n+1, earn, m))
+        print("{:<{}}{:>{}.2%}".format("epi", n+1, epi, m))
 
         # print の出力先を元に戻す
         if path:
@@ -475,3 +500,15 @@ class Bkeep:
                     if isinstance(tr[0], str):
                         tr[0] = strdt(tr[0])
 
+    def _acquire_keys(self):
+        """ self.initial から要素・勘定科目名を抽出する関数"""
+        for elem in self.initial.keys():
+            yield elem
+            for x in self.initial[elem].keys():
+                yield x
+
+    def _acquire_values(self, data):
+        """ data (tb もしくは fs) から各科目の金額を抽出する関数 """
+        for elem in data.keys():
+            for x in data[elem].values():
+                yield x
