@@ -90,6 +90,9 @@ class Bkeep:
             else:
                 self.initial = json.load(rf)
 
+        # nested list の作成
+        self._mkNamesDict()
+
         # 財務諸表データの初期化
         self.fs = {}
 
@@ -388,6 +391,14 @@ class Bkeep:
 
     # 内部関数
 
+    def _mkNamesDict(self):
+        keys = self._acquire_keys()
+        self._nestdict = {x.split(":")[-1] : x for x in keys}
+
+    def _getanm(self, name):
+        """ 省略形 (最終項目名のみ) 表示を正式名称に変換する """
+        return self._nestdict[name] if name else ""
+
     def _alignjnl(self, data):
         """ 仕訳データの金額部分について、コメントを除き、整数化する"""
         for Dname, Damount, Cname, Camount in data:
@@ -395,6 +406,7 @@ class Bkeep:
             Camount = rmcmt(Camount)
             Damount = int(Damount) if Dname else 0
             Camount = int(Camount) if Cname else 0
+            Dname, Cname = self._getanm(Dname), self._getanm(Cname)
             yield Dname, Damount, Cname, Camount, comment
 
     def _adjentry(self, date, entry):
@@ -503,7 +515,6 @@ class Bkeep:
     def _acquire_keys(self):
         """ self.initial から要素・勘定科目名を抽出する関数"""
         for elem in self.initial.keys():
-            yield elem
             for x in self.initial[elem].keys():
                 yield x
 
