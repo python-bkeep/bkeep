@@ -233,22 +233,40 @@ class Bkeep:
         if not add:
             self.fs = {}
 
-        # 試算表データの格納
-        self.fs[self._tbname] = copy.deepcopy(self.tb)
+        # fs 項目の初期化
+        self.fs[self._tbname] = self.clear_fs()
+        fs = self.fs[self._tbname]
+
+        # fs 項目の格納
+        for elem in fs.keys():
+
+            # tb 項目のプールの作成
+            pool = [x.split(":") for x in self._acquire_keys(self.tb)]
+
+            # fs の各項目の計算対象の抽出
+            for x in fs[elem].keys():
+                s = x.replace(":", "")
+                trg = (":".join(y) for y in pool if s in y) 
+
+                # 計算対象の合計と格納
+                fs[elem][x] = sum(self.tb[elem][y] for y in trg)
+
+            # 項目の合計値の格納
+            fs[elem][elem.upper()] = sum(self.tb[elem].values())
+                
 
     def cat(self, path=None, encoding="utf-8"):
         """ 貸借対照表・損益計算書の作成
         self.fs を参照する """
 
-        # 現状はまだ tb を参照している
-
-        total = {x : sum(self.tb[x].values()) for x in self.tb.keys()}
+        fs = self.fs[self._tbname]
+        total = {x : fs[x][x.upper()] for x in fs.keys()}
         earn = total["income"] - total["expenses"]
         epi = earn / total["income"] if total["income"] else 0
 
         # 勘定科目名の最大値
-        n = max(len(x) for x in self._acquire_keys())
-        m = max(len("{:,d}".format(x)) for x in self._acquire_values(self.tb))
+        n = max(len(x.replace(":", "  ")) for x in self._acquire_keys(fs))
+        m = max(len("{:,d}".format(x)) for x in self._acquire_values(fs)) 
         m = max([5, m])
 
         # path が指定されている場合はそこに出力する
@@ -256,11 +274,11 @@ class Bkeep:
             sys.stdout = open(path, "w", encoding=encoding)
 
         # 結果の print (assets ~ expenses)
-        for elem in self.tb.keys():
+        for elem in fs.keys():
             print(elem.upper())
             print("=============")
-            for x in self.tb[elem].items():
-                print("{:<{}}{:>{},d}".format(x[0], n+1, x[1], m))
+            for x in list(fs[elem].items())[:-1]:
+                print("{:<{}}{:>{},d}".format(x[0].replace(":", "  "), n+1, x[1], m))
             print("-------------")
             print("{:<{}}{:>{},d}\n".format("TOTAL", n+1, total[elem], m))
 
@@ -382,6 +400,37 @@ class Bkeep:
         else:
             self.tb = {x : {} for x in self.initial.keys()}
 
+    def clear_fs(self):
+        """ fs の要素を初期化 """
+
+        # ordered 属性がある場合、od を適用
+        cldict = od if self._ordered else dict
+
+        # box は要素の重複をチェックする集合
+        fs, box = cldict(), set()
+
+        # 5 要素のループ
+        for elem in self.initial.keys():
+
+            fs[elem] = cldict()
+
+            # 勘定科目のループ
+            for accs in self.initial[elem].keys():
+
+                spc = ""    # 階層ごとにインデント
+
+                # 階層のループ
+                for x in accs.split(":"):
+                    if x not in box:
+                        fs[elem][spc + x] = 0
+                        box.add(x)
+
+                    # インデントの追加
+                    spc += ":"
+
+        # 返り値
+        return fs
+
     def sort(self):
         """ ledger の各勘定について、datetime.date の順でソートする """
         for elem in self.ledger.keys():
@@ -392,7 +441,7 @@ class Bkeep:
     # 内部関数
 
     def _mkNamesDict(self):
-        keys = self._acquire_keys()
+        keys = self._acquire_keys(self.initial)
         self._nestdict = {x.split(":")[-1] : x for x in keys}
 
     def _getanm(self, name):
@@ -512,10 +561,10 @@ class Bkeep:
                     if isinstance(tr[0], str):
                         tr[0] = strdt(tr[0])
 
-    def _acquire_keys(self):
+    def _acquire_keys(self, data):
         """ self.initial から要素・勘定科目名を抽出する関数"""
-        for elem in self.initial.keys():
-            for x in self.initial[elem].keys():
+        for elem in data.keys():
+            for x in data[elem].keys():
                 yield x
 
     def _acquire_values(self, data):

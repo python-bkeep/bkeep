@@ -58,19 +58,17 @@ if __name__ == "__main__":
     if args.calccsv:
 
         # 仕訳データの出力
-        bk.write_journal(os.path.join(bkoutput, "journal.csv"),
-                         encoding="shift-jis")
+        bk.write_journal(os.path.join(bkoutput, "journal.csv"))
 
         # 月次 csv データの作成
-        with open(os.path.join(bkoutput, "fsMonthly.csv"), "w",
-                  encoding="shift-jis") as wf:
+        with open(os.path.join(bkoutput, "fsMonthly.csv"), "w") as wf:
             csv.writer(wf).writerows(bk.calcMonthly(start, end))
 
         # 週次 csv データの作成
-        with open(os.path.join(bkoutput, "fsWeekly.csv"), "w",
-                  encoding="shift-jis") as wf:
+        with open(os.path.join(bkoutput, "fsWeekly.csv"), "w") as wf:
             csv.writer(wf).writerows(bk.calcSpan(start, end))
 
     # 試算表と FS の作成
     bk.prepare(datetime.date(end.year, end.month, 1), end)
+    bk.make()
     bk.cat()
