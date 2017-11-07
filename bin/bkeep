@@ -61,12 +61,12 @@ if __name__ == "__main__":
         bk.write_journal(os.path.join(bkoutput, "journal.csv"))
 
         # 月次 csv データの作成
-        with open(os.path.join(bkoutput, "fsMonthly.csv"), "w") as wf:
-            csv.writer(wf).writerows(bk.calcMonthly(start, end))
+        bk.calcSpan(bk.mkMonth(start, end))
+        bk.saveSpan(os.path.join(bkoutput, "fsMonthly.csv"))
 
         # 週次 csv データの作成
-        with open(os.path.join(bkoutput, "fsWeekly.csv"), "w") as wf:
-            csv.writer(wf).writerows(bk.calcSpan(start, end))
+        bk.calcSpan(bk.mkSpan(start, end))
+        bk.saveSpan(os.path.join(bkoutput, "fsWeekly.csv"))
 
     # 試算表と FS の作成
     bk.prepare(datetime.date(end.year, end.month, 1), end)

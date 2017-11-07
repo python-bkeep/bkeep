@@ -296,51 +296,67 @@ class Bkeep:
 
     # 月次・週次データの作成
 
-    def calcMonthly(self, start, end):
-        """ 月次データの作成
-        最終月は当日までのデータ """
+    def mkMonth(self, start, end):
+        """ 月次 csv 用の start -- end の組み合わせ作成 """
 
-        # start -- end の組の作成
-        periods = []
         while start <= end:
             mid = maxday(start)
             mid = mid if mid < end else end
-            periods.append((start, mid))
+            yield (start, mid)
             start = mid + datetime.timedelta(days=1)
 
-        # 列名の作成
-        rslt = []
-        rslt.append(self._makeData(start, end, True))
+    def mkSpan(self, start, end, span=7):
+        """ 任意の期間の start -- end の組み合わせ作成
+        起点は end
+        逆順になっているため、利用側で reversed を実施する """
 
-        # データの作成
-        for x in periods:
-            rslt.append(self._makeData(*x))
-
-        # 結果の保存
-        return rslt
-
-    def calcSpan(self, start, end, span=7):
-        """ 週次データの作成 (span=7 の場合)
-        当日を起点に期間ずつ集計する """
-
-        # start -- end の組の作成
-        periods = []
         while start <= end:
             mid = end - datetime.timedelta(days=span-1)
             mid = mid if mid > start else start
-            periods.insert(0, (mid, end))
+            yield (mid, end)
             end = mid - datetime.timedelta(days=1)
 
-        # 列名の作成
-        rslt = []
-        rslt.append(self._makeData(start, end, True))
+    def calcSpan(self, span):
+        """ span (start -- end のタプルからなる iterable) をもとに
+        prepare, make をおこなう """
 
-        # データの作成
-        for x in periods:
-            rslt.append(self._makeData(*x))
+        fs = {}
+        for x in span:
+            self.prepare(*x)
+            self.make(add=True)
 
-        # 結果の保存
-        return rslt
+    def saveSpan(self, path, encoding="utf-8"):
+        """ 複数期間からなる FS を path に保存する """
+
+        span = sorted(self.fs.keys(), key=lambda x: (x[1], x[0]))
+        name = ["start", "end", "earn", "epi"]
+        name.extend(self._acquire_keys(self.fs[self._tbname]))
+        rslt = [name]
+        for prd in span:
+            # start と end
+            x = list(prd)
+
+            # earn の計算
+            x.append(
+                self.fs[prd]["income"]["INCOME"] -
+                self.fs[prd]["expenses"]["EXPENSES"]
+            )
+
+            # epi の計算
+            x.append(
+                x[-1] / self.fs[prd]["income"]["INCOME"]
+            )
+
+            # 他の部分の追加
+            x.extend(self._acquire_values(self.fs[prd]))
+
+            # rslt への append
+            rslt.append(x)
+
+        # データの保存
+        with open (path, "w", encoding=encoding) as wf:
+            csv.writer(wf).writerows(rslt)
+
 
 
     # 特殊なデータの読み込み・初期化
