@@ -320,7 +320,7 @@ class Bkeep:
         """ span (start -- end のタプルからなる iterable) をもとに
         prepare, make をおこなう """
 
-        fs = {}
+        self.fs = {}
         for x in span:
             self.prepare(*x)
             self.make(add=True)
