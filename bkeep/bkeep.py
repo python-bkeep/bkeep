@@ -336,16 +336,15 @@ class Bkeep:
             # start と end
             x = list(prd)
 
+            # income と expenses の計算
+            R = self.fs[prd]["income"]["INCOME"]
+            L = self.fs[prd]["expenses"]["EXPENSES"]
+
             # earn の計算
-            x.append(
-                self.fs[prd]["income"]["INCOME"] -
-                self.fs[prd]["expenses"]["EXPENSES"]
-            )
+            x.append(R - L)
 
             # epi の計算
-            x.append(
-                x[-1] / self.fs[prd]["income"]["INCOME"]
-            )
+            x.append(x[-1] / R if R else 0)
 
             # 他の部分の追加
             x.extend(self._acquire_values(self.fs[prd]))
