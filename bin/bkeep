@@ -78,7 +78,7 @@ if __name__ == "__main__":
 
     if args.entire:
         # 全期間を選択した場合
-        bk.prepare(start, max(inpdict.keys())
+        bk.prepare(start, max(inpdict.keys()))
     else:
         # それ以外の場合 (月次で集計))
         bk.prepare(datetime.date(end.year, end.month, 1), end)
