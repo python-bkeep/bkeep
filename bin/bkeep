@@ -33,6 +33,12 @@ if __name__ == "__main__":
         help=r"calculate some csv files (default: False)"
     )
 
+    p.add_argument(
+        "--entire", "-e",
+        action="store_true", default=False,
+        help=r"calculate for entire period (default: False)"
+    )
+
     args = p.parse_args()
 
     # 基本変数の定義
@@ -69,6 +75,13 @@ if __name__ == "__main__":
         bk.saveSpan(os.path.join(bkoutput, "fsWeekly.csv"))
 
     # 試算表と FS の作成
-    bk.prepare(datetime.date(end.year, end.month, 1), end)
+
+    if args.entire:
+        # 全期間を選択した場合
+        bk.prepare(start, max(inpdict.keys())
+    else:
+        # それ以外の場合 (月次で集計))
+        bk.prepare(datetime.date(end.year, end.month, 1), end)
+
     bk.make()
     bk.cat()
