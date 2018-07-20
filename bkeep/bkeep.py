@@ -264,6 +264,12 @@ class Bkeep:
         earn = total["income"] - total["expenses"]
         epi = earn / total["income"] if total["income"] else 0
 
+        # 費用項目のデフレート
+        # income に唯一の salary が存在するならば、salary をデフレーターにし、
+        # そうでない場合は、収益総額をデフレーターにする
+        namebox = [s for s in fs['income'].keys() if 'salary' in s]
+        exdeflator = fs['income'][namebox[0]] if len(namebox) == 1 else total['income']
+
         # 勘定科目名の最大値
         n = max(len(x.replace(":", "  ")) for x in self._acquire_keys(fs))
         m = max(len("{:,d}".format(x)) for x in self._acquire_values(fs)) 
@@ -277,10 +283,16 @@ class Bkeep:
         for elem in fs.keys():
             print(elem.upper())
             print("=============")
-            for x in list(fs[elem].items())[:-1]:
-                print("{:<{}}{:>{},d}".format(x[0].replace(":", "  "), n+1, x[1], m))
-            print("-------------")
-            print("{:<{}}{:>{},d}\n".format("TOTAL", n+1, total[elem], m))
+            if elem == 'expenses':
+                for x in list(fs[elem].items())[:-1]:
+                    print("{:<{}}{:>{},d}{:>{}.2%}".format(x[0].replace(":", "  "), n+1, x[1], m, (x[1] / exdeflator), m))
+                print("-------------")
+                print("{:<{}}{:>{},d}{:>{}.2%}\n".format("TOTAL", n+1, total[elem], m, (total[elem] / exdeflator), m))
+            else:
+                for x in list(fs[elem].items())[:-1]:
+                    print("{:<{}}{:>{},d}".format(x[0].replace(":", "  "), n+1, x[1], m))
+                print("-------------")
+                print("{:<{}}{:>{},d}\n".format("TOTAL", n+1, total[elem], m))
 
         # 結果の print (summary)
         print("SUMMARY")
