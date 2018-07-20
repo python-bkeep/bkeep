@@ -273,6 +273,7 @@ class Bkeep:
         # 勘定科目名の最大値
         n = max(len(x.replace(":", "  ")) for x in self._acquire_keys(fs))
         m = max(len("{:,d}".format(x)) for x in self._acquire_values(fs)) 
+        mp = max(len("{:.2%}".format(x)) for x in self._acquire_values(fs)) 
         m = max([5, m])
 
         # path が指定されている場合はそこに出力する
@@ -285,9 +286,9 @@ class Bkeep:
             print("=============")
             if elem == 'expenses':
                 for x in list(fs[elem].items())[:-1]:
-                    print("{:<{}}{:>{},d}{:>{}.2%}".format(x[0].replace(":", "  "), n+1, x[1], m, (x[1] / exdeflator), m))
+                    print("{:<{}}{:>{},d}{:>{}.2%}".format(x[0].replace(":", "  "), n+1, x[1], m, (x[1] / exdeflator), mp))
                 print("-------------")
-                print("{:<{}}{:>{},d}{:>{}.2%}\n".format("TOTAL", n+1, total[elem], m, (total[elem] / exdeflator), m))
+                print("{:<{}}{:>{},d}{:>{}.2%}\n".format("TOTAL", n+1, total[elem], m, (total[elem] / exdeflator), mp))
             else:
                 for x in list(fs[elem].items())[:-1]:
                     print("{:<{}}{:>{},d}".format(x[0].replace(":", "  "), n+1, x[1], m))
