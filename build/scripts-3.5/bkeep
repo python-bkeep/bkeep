@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
 import os, argparse, re, datetime, csv
@@ -31,24 +31,6 @@ if __name__ == "__main__":
         "--calccsv", "-c",
         action="store_true", default=False,
         help=r"calculate some csv files (default: False)"
-    )
-
-    p.add_argument(
-        "--entire", "-e",
-        action="store_true", default=False,
-        help=r"calculate for entire period (default: False)"
-    )
-
-    p.add_argument(
-        "--show",
-        action="store_true", default=False,
-        help=r"show a figure of propotional scaled pl"
-    )
-
-    p.add_argument(
-        "--save",
-        default=None,
-        help=r"save a figure of propotional scaled pl"
     )
 
     args = p.parse_args()
@@ -87,48 +69,6 @@ if __name__ == "__main__":
         bk.saveSpan(os.path.join(bkoutput, "fsWeekly.csv"))
 
     # 試算表と FS の作成
-
-    if args.entire:
-        # 全期間を選択した場合
-        bk.prepare(start, max(inpdict.keys()))
-    else:
-        # それ以外の場合 (月次で集計))
-        bk.prepare(datetime.date(end.year, end.month, 1), end)
-
-    # 比例縮尺 PL の表示
-    if args.show or args.save:
-
-        # psfs パッケージのインポートと初期化
-        import psfs
-        prop = psfs.Prop()
-
-        # initial data の作成
-        trgnm = (
-            datetime.date(end.year, end.month, 1).strftime("%Y-%m-%d") +
-            " ~ " +
-            end.strftime("%Y-%m-%d")
-        )
-        prop.initial = {trgnm : {"type" : "pl"}}
-
-        # T/B 情報の記入
-        prop.initial[trgnm]["income"] = bk.tb["income"]
-        prop.initial[trgnm]["expenses"] = bk.tb["expenses"]
-
-        # title, threshold 等の設定
-        prop.sub, prop.threshold = True, 0.02
-
-        # setoption と prepare
-        prop.setOptions()
-        prop.prepare()
-
-        # 図の出力
-        if args.show:
-            prop.show()
-            input("Press ENTER")
-        else:
-            fs.savefig(args.save)
-        
-
-    # 出力
+    bk.prepare(datetime.date(end.year, end.month, 1), end)
     bk.make()
     bk.cat()
