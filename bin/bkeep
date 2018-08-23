@@ -126,7 +126,7 @@ if __name__ == "__main__":
             prop.show()
             input("Press ENTER")
         else:
-            fs.savefig(args.save)
+            prop.savefig(args.save)
         
 
     # 出力
