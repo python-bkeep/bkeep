@@ -118,6 +118,7 @@ if __name__ == "__main__":
         prop.sub = True
         prop.threshold = 0.02
         prop.sharey = True
+        prop.xratio = 2 / (1 + 5 ** (1/2))
 
         # setoption と prepare
         prop.setOptions()
