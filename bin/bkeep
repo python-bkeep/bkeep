@@ -115,7 +115,9 @@ if __name__ == "__main__":
         prop.initial[trgnm]["expenses"] = bk.tb["expenses"]
 
         # title, threshold 等の設定
-        prop.sub, prop.threshold = True, 0.02
+        prop.sub = True
+        prop.threshold = 0.02
+        prop.sharey = True
 
         # setoption と prepare
         prop.setOptions()
