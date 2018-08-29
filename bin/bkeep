@@ -116,7 +116,7 @@ if __name__ == "__main__":
 
         # title, threshold 等の設定
         prop.sub = True
-        prop.threshold = 0.02
+        prop.threshold = 0.01
         prop.sharey = True
         prop.xratio = 2 / (1 + 5 ** (1/2))
 
