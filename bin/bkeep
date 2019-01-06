@@ -22,7 +22,7 @@ if __name__ == "__main__":
     )
 
     p.add_argument(
-        "--from",
+        "--startpoint",
         default=None,
         help=r"when is the calculation start point?"
     )
@@ -97,9 +97,9 @@ if __name__ == "__main__":
     if args.entire:
         # 全期間を選択した場合
         bk.prepare(start, max(inpdict.keys()))
-    elif args.from:
-        # from が指定されている場合
-        bk.prepare(bkeep.strdt(args.from), end)
+    elif args.startpoint:
+        # startpoint が指定されている場合
+        bk.prepare(bkeep.strdt(args.startpoint), end)
     else:
         # それ以外の場合 (月次で集計))
         bk.prepare(datetime.date(end.year, end.month, 1), end)
